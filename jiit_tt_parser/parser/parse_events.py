@@ -57,7 +57,7 @@ class Period:
         start = fmt.replace("\xa0", " ").strip(" -\n")
 
         start_hour, start_min = int(start), 0
-        end_hour, end_min = start_hour + 1, 50
+        end_hour, end_min = start_hour, 50
 
         if start_hour < 8:
             start_hour += 12
