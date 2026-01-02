@@ -1,7 +1,7 @@
 import datetime
-from typing import Dict, Literal, List
-import string
 import re
+import string
+from typing import Dict, List, Literal
 
 from openpyxl.cell import Cell, MergedCell
 from openpyxl.worksheet.cell_range import CellRange
@@ -9,8 +9,8 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from jiit_tt_parser.parser.parse_courses import parse_courses
 from jiit_tt_parser.parser.parse_electives import parse_electives
-from jiit_tt_parser.utils.utils import are_cells_in_same_merged_group, is_empty_row
-from jiit_tt_parser.utils.utils import load_map
+from jiit_tt_parser.utils.utils import (are_cells_in_same_merged_group,
+                                        is_empty_row, load_map)
 
 days_of_the_week_names = [
     "monday",
@@ -32,7 +32,11 @@ class Period:
 
     @classmethod
     def from_string(cls, fmt: str):
-        start, end = fmt.split("-")
+        parts = fmt.split("-")
+        if len(parts) > 2:
+            start, end = parts[0], parts[-1]
+        else:
+            start, end = fmt.split("-")
         start = start.strip(" NO")
         end = end.strip("APM ")
 
@@ -125,25 +129,50 @@ class Elective:
         raw_batches = extract_substrings(raw_batches)
         ev.batches = []
         ev.batch_cats = []
+        raw_batches_128 = ""
+        try:
+            raw_batches_128 = raw_batches[0]
+        except:
+            pass
+        print(raw_batches)
 
-        for batch_str in raw_batches:
-            batch_str = batch_str.strip()
-            if "-" in batch_str:
-                ev.batches.extend(parse_range(batch_str))
-                continue
+        if (
+            "F1" in raw_batches_128
+            or "E1" in raw_batches_128
+            or "F8" in raw_batches_128
+        ):
+            ev.batches = parse_batches(raw_batches_128)
+            print("f found")
 
-            if batch_str.isalpha():
-                ev.batch_cats = [i for i in batch_str]
-                continue
+        elif "ALL" in raw_batches_128:
+            ev.batches = []
+            ev.batch_cats = ["E", "F", "H"]
+            print("all found")
 
-            if batch_str[:2].isalpha() and batch_str[0] in ["L", "T", "P"]:
-                batch_str = batch_str[1:]
+        else:
+            print("else condn")
+            for batch_str in raw_batches:
+                batch_str = batch_str.strip()
+                if "-" in batch_str:
+                    ev.batches.extend(parse_range(batch_str))
+                    continue
 
-            ev.batches.append(batch_str)
+                if batch_str.isalpha():
+                    ev.batch_cats = [i for i in batch_str]
+                    continue
+
+                if batch_str[:2].isalpha() and batch_str[0] in ["L", "T", "P"]:
+                    batch_str = batch_str[1:]
+
+                ev.batches.append(batch_str)
 
         ev.eventcode, ev_str = ev_str[1 : ev_str.find(")")], ev_str[ev_str.find(")") :]
         ev.eventcode = ev.eventcode.strip()
-        ev.event = lookup_sub(ev.eventcode.strip(), courses) or lookup_sub(ev.eventcode.strip(), courses["super_secret_key"]) or ""
+        ev.event = (
+            lookup_sub(ev.eventcode.strip(), courses)
+            or lookup_sub(ev.eventcode.strip(), courses["super_secret_key"])
+            or ""
+        )
         ev.event = " ".join(ev.event.strip().split())
 
         while (ev_str) and ev_str[
@@ -265,9 +294,29 @@ class Event:
                 "(15B11EC313)",
                 "(25B32EC211)",
                 "(20B12EC211)",
+                "25B42EC211",
+                "21B12CS319",
+                "25B42EC212",
             ]
         ):
             return Elective.from_string(ev_str, period, day, courses, faculties, "DE-1")
+        if any(
+            e in ev_str
+            for e in [
+                "15B1NHS431",
+                "16B1NHS431",
+                "15B1NHS433",
+                "16B1NHS332",
+                "23B12HS211",
+                "15B1NHS433",
+                "16B1NHS332",
+                "23B12HS211",
+                "19B12HS412",
+            ]
+        ):
+            return Elective.from_string(
+                ev_str, period, day, courses, faculties, "HSS-1"
+            )
 
         ev_str = ev_str.strip().replace("\n", " ").replace("\xa0", " ")
         print(repr(ev_str))
@@ -364,7 +413,11 @@ class Event:
         ev.eventcode = ev.eventcode.strip()
         if ev.eventcode == "M302":
             ev.eventcode = "MA302"
-        ev.event = lookup_sub(ev.eventcode.strip(), courses) or lookup_sub(ev.eventcode.strip(), courses["super_secret_key"]) or ""
+        ev.event = (
+            lookup_sub(ev.eventcode.strip(), courses)
+            or lookup_sub(ev.eventcode.strip(), courses["super_secret_key"])
+            or ""
+        )
         ev.event = " ".join(
             ev.event.replace("\xa0", " ").replace("\n", " ").strip().split()
         )
@@ -703,7 +756,10 @@ def fix_128tt_bad_merged_cells(
     if len(instances) > 1:
         ev_strs = split_on_regex_starts(str(v), EVENT_HEAD_RE)
         for i, ev_str in enumerate(ev_strs):
-            ep = periods[j + i - 2]
+            try:
+                ep = periods[j + i - 2]
+            except:
+                ep = periods[j + i - 3]
             ev = Event.from_string(ev_str, ep, day, courses, faculties)
             events.append(ev)
 
@@ -759,7 +815,6 @@ def parse_day_with_electives(
         i.replace("\xa0", " ").replace("\n", " ").strip().upper().strip("/\\")
         for i in spam_entries
     ]
-    
 
     elective_cats = get_elective_categories_map()
 
@@ -911,8 +966,12 @@ def parse_day(
                 continue
 
             ep = periods[j - 2]
+
             if m := search_merged_cells(merged_cells, c):
-                ep += periods[m - 2]
+                try:
+                    ep += periods[m - 2]
+                except:
+                    ep += periods[m - 3]
 
             ev = Event.from_string(ev_str, ep, day, courses, faculties)
             if ev is None:
@@ -941,9 +1000,8 @@ def parse_events(
     curriculum_courses.update(courses)
     curriculum_courses["EC112"] = "Basic Electronics for Biotechnology"
 
-
     new_courses = {}
-    for k,v in courses.items():
+    for k, v in courses.items():
         new_courses.update({k[3:]: v, k: v})
     curriculum_courses["super_secret_key"] = new_courses
 

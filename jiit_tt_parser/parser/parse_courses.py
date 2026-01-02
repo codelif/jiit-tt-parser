@@ -1,4 +1,5 @@
 from typing import Dict
+
 from openpyxl.worksheet.worksheet import Worksheet
 
 
@@ -39,7 +40,7 @@ def parse_down(sheet: Worksheet, i, j, r, _, ftype):
                 v1, v2 = v.split("/")
             else:
                 v1 = v2 = v
-            
+
             update(course_map, v1.strip(), s, v2.strip(), s, v.strip(), s)
             # course_map.update({v1.strip(): s, v2.strip(): s, v.strip(): s})
     elif ftype == 3:
@@ -80,6 +81,18 @@ def parse_down(sheet: Worksheet, i, j, r, _, ftype):
             update(course_map, short, name)
             # course_map[short] = name
 
+    elif ftype == 6:
+        while i <= r:
+            faculty_name = sheet.cell(i, j).value  # col: Faculty Names
+            faculty_abbr = sheet.cell(i, j + 1).value  # col: Faculty Abbreviation
+            code = sheet.cell(i, j + 4).value  # col: COURSE CODE
+            title = sheet.cell(i, j + 5).value  # col: COURSE TITLE
+            i += 1
+            if not code or not title:
+                continue
+            update(course_map, str(code).strip(), str(title).strip())
+
+    # print(course_map)
     return course_map
 
 
@@ -96,7 +109,9 @@ def parse_courses(sheet: Worksheet, row: int, col: int):
                 nvalue in ["Subject Code", "SUBJECT CODE"]
             ):
                 course_map.update(parse_down(sheet, i + 1, j, row, col, ftype=1))
-            elif value in ["SHORT FORM / SUBJECT CODE", "SHORT FORM /"] and nvalue in ["SUBJECT NAME"]:
+            elif value in ["SHORT FORM / SUBJECT CODE", "SHORT FORM /"] and nvalue in [
+                "SUBJECT NAME"
+            ]:
                 course_map.update(parse_down(sheet, i + 1, j, row, col, ftype=2))
             elif (
                 pvalue in ["Name"]
@@ -116,6 +131,12 @@ def parse_courses(sheet: Worksheet, row: int, col: int):
 
             elif value == "Short Name" and nvalue == "Course Code":
                 course_map.update(parse_down(sheet, i + 1, j, row, col, ftype=1))
+            elif value == "Faculty Names" and nvalue == "Faculty Abbreviation":
+                v2 = str(sheet.cell(i, j + 4).value)
+                v3 = str(sheet.cell(i, j + 5).value)
+                if v2 == "COURSE CODE" and v3 == "COURSE TITLE":
+                    course_map.update(parse_down(sheet, i + 1, j, row, col, ftype=6))
+
     return course_map
 
 
@@ -126,8 +147,7 @@ def update(map: Dict[str, str], *keyvalues: str):
     for i in range(0, len(keyvalues), 2):
         key = keyvalues[i]
         value = keyvalues[i + 1]
-        if len(key) == 10: # if full sized code then add its derivatives
+        if len(key) == 10:  # if full sized code then add its derivatives
             map.update({key: value, key[2:]: value, key[3:]: value})
         else:
             map[key] = value
-

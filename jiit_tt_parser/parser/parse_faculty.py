@@ -1,8 +1,9 @@
+import json
+
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
-import json
-from jiit_tt_parser.utils.utils import max_bounds
 
+from jiit_tt_parser.utils.utils import max_bounds
 
 PATH = "faculty.xlsx"
 
@@ -95,6 +96,16 @@ def parse_down_bca_N_128(sheet, r, c):
     return faculty_map
 
 
+def parse_down_128_sem4(sheet, r, c):
+    faculty_map = {}
+    while (v := sheet.cell(r, c).value) is not None:
+        v2 = sheet.cell(r, c + 1).value
+        faculty_map.update({str(v2).strip(): str(v).strip()})
+        r += 1
+
+    return faculty_map
+
+
 def generate_faculty_map_from_bca1_N_128(sheet: Worksheet, row: int, col: int):
     faculty_map = {}
     for i in range(1, row + 1):
@@ -107,6 +118,18 @@ def generate_faculty_map_from_bca1_N_128(sheet: Worksheet, row: int, col: int):
     return faculty_map
 
 
+def generate_faculty_map_from_128_sem4(sheet: Worksheet, row: int, col: int):
+    faculty_map = {}
+    for i in range(1, row + 1):
+        for j in range(1, col + 1):
+            v = sheet.cell(i, j).value
+
+            if str(v).strip().startswith("Faculty Names"):
+                faculty_map.update(parse_down_128_sem4(sheet, i + 1, j))
+
+    return faculty_map
+
+
 def get_faculty_map_from_bca1_N_128(path):
     wb = openpyxl.load_workbook(path)
     sheet = wb.active
@@ -115,6 +138,18 @@ def get_faculty_map_from_bca1_N_128(path):
 
     r, c = max_bounds(sheet)
     faculty_map = generate_faculty_map_from_bca1_N_128(sheet, r, c)
+
+    return faculty_map
+
+
+def get_faculty_map_from_128_sem4(path):
+    wb = openpyxl.load_workbook(path)
+    sheet = wb.active
+    if sheet is None:
+        return {}
+
+    r, c = max_bounds(sheet)
+    faculty_map = generate_faculty_map_from_128_sem4(sheet, r, c)
 
     return faculty_map
 
