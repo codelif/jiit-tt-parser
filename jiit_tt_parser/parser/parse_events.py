@@ -86,7 +86,7 @@ class Period:
         return f"{self.start_time.hour}:{str(self.start_time.minute).zfill(2)} - {self.end_time.hour}:{str(self.end_time.minute).zfill(2)}"
 
 
-pattern = re.compile(r"^\s*(?:[A-Z][0-9]+)(?:\s*[A-Z][0-9]+)*\s*$")
+pattern = re.compile(r"^\s*(?:[E-F][0-9]+)(?:\s*[E-F][0-9]+)*\s*$")
 
 
 class Elective:
