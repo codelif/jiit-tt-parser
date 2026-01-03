@@ -864,6 +864,7 @@ def parse_day_with_electives(
         "1NHS435": "Financial Accounting",
         "12HS211": "Introduction to Neoliberalism",
         "12HS212": "Science of Happiness",
+        "24HS211": "Media, Culture and Society",
         "HS213": "Sociology of Work",
         "HS433": "Introduction to Sociology",
         "HS412": "Industrial Economics",
@@ -1062,7 +1063,7 @@ def parse_events(
     for k, v in courses.items():
         new_courses.update({k[3:]: v, k: v})
     curriculum_courses["super_secret_key"] = new_courses
-
+    curriculum_courses["25B15EC311"] = "Digital Systems and Computer Organisation"
     events = []
     title = str(sheet.cell(1, 1).value).replace("\xa0", " ").replace("\n", " ").strip()
     is_4th_sem = "B.Tech IV SEMESTER-EVEN SEM 2026" in title
