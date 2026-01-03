@@ -86,7 +86,7 @@ class Period:
         return f"{self.start_time.hour}:{str(self.start_time.minute).zfill(2)} - {self.end_time.hour}:{str(self.end_time.minute).zfill(2)}"
 
 
-pattern = re.compile(r'^\s*(?:[A-Z][0-9]+)(?:\s*[A-Z][0-9]+)*\s*$')
+pattern = re.compile(r"^\s*(?:[A-Z][0-9]+)(?:\s*[A-Z][0-9]+)*\s*$")
 
 
 class Elective:
@@ -116,6 +116,9 @@ class Elective:
         if "LB5,B6(25B11EC311)-LT3/MO" in ev_str:
             return Event.from_string(ev_str, period, day, courses, faculties)
 
+        if "LB10-B14(CS211)-F8/NET" in ev_str:
+            category = "DE-1"
+
         ev_str = ev_str.strip().replace("\n", " ").replace("\xa0", " ")
         print(repr(ev_str))
         og = ev_str
@@ -131,7 +134,7 @@ class Elective:
         raw_batches = raw_batches.removeprefix("MINOR")
         raw_batches = raw_batches.removeprefix("-62")
         raw_batches = raw_batches.removeprefix("-128")
-        
+
         raw_batches = extract_substrings(raw_batches)
         ev.batches = []
         ev.batch_cats = []
@@ -832,6 +835,44 @@ def parse_day_with_electives(
         "25B16CS211": "Fundamentals of Data Analytics",
         "25B16CS212": "Fundamentals of Mobile Application Development",
         "25B16CS213": "Fundamentals of Smart Systems and IoT",
+        "24B12HS213": "Sociology of Work",
+        "15B1NHS433": "Introduction to Sociology",
+        "19B12HS412": "Industrial Economics",
+        "16B1NHS332": "Quantitative Methods for Social Sciences",
+        "15B1NHS431": "Introduction to Literature",
+        "15B1NHS434": "Principles of Management",
+        "15B1NHS435": "Financial Accounting",
+        "25B12HS211": "Introduction to Neoliberalism",
+        "23B12HS211": "Introduction to Political Science",
+        "24B12HS211": "Media, Culture and Society",
+        "24B12HS212": "Science of Happiness",
+        "B12HS213": "Sociology of Work",
+        "B1NHS433": "Introduction to Sociology",
+        "B12HS412": "Industrial Economics",
+        "B1NHS332": "Quantitative Methods for Social Sciences",
+        "B1NHS431": "Introduction to Literature",
+        "B1NHS434": "Principles of Management",
+        "B1NHS435": "Financial Accounting",
+        "B12HS211": "Introduction to Neoliberalism",
+        "B12HS212": "Science of Happiness",
+        "12HS213": "Sociology of Work",
+        "1NHS433": "Introduction to Sociology",
+        "12HS412": "Industrial Economics",
+        "1NHS332": "Quantitative Methods for Social Sciences",
+        "1NHS431": "Introduction to Literature",
+        "1NHS434": "Principles of Management",
+        "1NHS435": "Financial Accounting",
+        "12HS211": "Introduction to Neoliberalism",
+        "12HS212": "Science of Happiness",
+        "HS213": "Sociology of Work",
+        "HS433": "Introduction to Sociology",
+        "HS412": "Industrial Economics",
+        "HS332": "Quantitative Methods for Social Sciences",
+        "HS431": "Introduction to Literature",
+        "HS434": "Principles of Management",
+        "HS435": "Financial Accounting",
+        "HS211": "Introduction to Neoliberalism",
+        "HS212": "Science of Happiness",
     }
     courses = courses.copy()
     courses.update(hardcoded_bullshit)
