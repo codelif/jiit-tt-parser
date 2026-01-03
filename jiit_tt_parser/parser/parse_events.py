@@ -9,8 +9,11 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from jiit_tt_parser.parser.parse_courses import parse_courses
 from jiit_tt_parser.parser.parse_electives import parse_electives
-from jiit_tt_parser.utils.utils import (are_cells_in_same_merged_group,
-                                        is_empty_row, load_map)
+from jiit_tt_parser.utils.utils import (
+    are_cells_in_same_merged_group,
+    is_empty_row,
+    load_map,
+)
 
 days_of_the_week_names = [
     "monday",
@@ -83,6 +86,9 @@ class Period:
         return f"{self.start_time.hour}:{str(self.start_time.minute).zfill(2)} - {self.end_time.hour}:{str(self.end_time.minute).zfill(2)}"
 
 
+pattern = re.compile(r'^\s*(?:[A-Z][0-9]+)(?:\s*[A-Z][0-9]+)*\s*$')
+
+
 class Elective:
     def __init__(self, event_string: str):
         self.event_string = event_string
@@ -125,7 +131,7 @@ class Elective:
         raw_batches = raw_batches.removeprefix("MINOR")
         raw_batches = raw_batches.removeprefix("-62")
         raw_batches = raw_batches.removeprefix("-128")
-
+        
         raw_batches = extract_substrings(raw_batches)
         ev.batches = []
         ev.batch_cats = []
@@ -135,12 +141,8 @@ class Elective:
         except:
             pass
         print(raw_batches)
-
-        if (
-            "F1" in raw_batches_128
-            or "E1" in raw_batches_128
-            or "F8" in raw_batches_128
-        ):
+        print(raw_batches_128)
+        if bool(pattern.match(raw_batches_128)):
             ev.batches = parse_batches(raw_batches_128)
             print("f found")
 
@@ -282,7 +284,7 @@ class Event:
         courses: dict,
         faculties: dict,
     ):
-        if any(e in ev_str for e in ["(25B16CS213)", "(25B16CS212)"]):
+        if any(e in ev_str for e in ["25B16CS213", "25B16CS212", "25B16CS211"]):
             return Elective.from_string(
                 ev_str, period, day, courses, faculties, "DE-1 LAB"
             )
@@ -297,6 +299,9 @@ class Event:
                 "25B42EC211",
                 "21B12CS319",
                 "25B42EC212",
+                "25B12CS211",
+                "25B12CS212",
+                "25B12CS213",
             ]
         ):
             return Elective.from_string(ev_str, period, day, courses, faculties, "DE-1")
@@ -817,7 +822,19 @@ def parse_day_with_electives(
     ]
 
     elective_cats = get_elective_categories_map()
-
+    hardcoded_bullshit = {
+        "25B12CS211": "Fundamentals of Data Analytics",
+        "25B12CS212": "Fundamentals of Mobile Application Development",
+        "25B12CS213": "Fundamentals of Smart Systems and IoT",
+        "CS211": "Fundamentals of Data Analytics",
+        "CS212": "Fundamentals of Mobile Application Development",
+        "CS213": "Fundamentals of Smart Systems and IoT",
+        "25B16CS211": "Fundamentals of Data Analytics",
+        "25B16CS212": "Fundamentals of Mobile Application Development",
+        "25B16CS213": "Fundamentals of Smart Systems and IoT",
+    }
+    courses = courses.copy()
+    courses.update(hardcoded_bullshit)
     events = []
     if str(sheet.cell(start, 2).value).startswith("9"):
         start += 1
