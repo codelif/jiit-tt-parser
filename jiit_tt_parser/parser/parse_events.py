@@ -119,6 +119,7 @@ class Elective:
         ev_str = ev_str.strip().replace("\n", " ").replace("\xa0", " ")
         print(repr(ev_str))
         og = ev_str
+        ev_str = ev_str.replace("A10-A15", "A10,A15")
 
         if ev_str == "":
             return None
@@ -156,6 +157,7 @@ class Elective:
             for batch_str in raw_batches:
                 batch_str = batch_str.strip()
                 batch_str = re.sub(r"([A-Za-z])\1+", r"\1", batch_str)
+                print(batch_str)
                 if "-" in batch_str:
                     ev.batches.extend(parse_range(batch_str))
                     continue
