@@ -9,11 +9,8 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from jiit_tt_parser.parser.parse_courses import parse_courses
 from jiit_tt_parser.parser.parse_electives import parse_electives
-from jiit_tt_parser.utils.utils import (
-    are_cells_in_same_merged_group,
-    is_empty_row,
-    load_map,
-)
+from jiit_tt_parser.utils.utils import (are_cells_in_same_merged_group,
+                                        is_empty_row, load_map)
 
 days_of_the_week_names = [
     "monday",
@@ -158,6 +155,7 @@ class Elective:
             print("else condn")
             for batch_str in raw_batches:
                 batch_str = batch_str.strip()
+                batch_str = re.sub(r"([A-Za-z])\1+", r"\1", batch_str)
                 if "-" in batch_str:
                     ev.batches.extend(parse_range(batch_str))
                     continue
