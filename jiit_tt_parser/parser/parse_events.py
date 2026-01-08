@@ -120,6 +120,10 @@ class Elective:
         print(repr(ev_str))
         og = ev_str
         ev_str = ev_str.replace("A10-A15", "A10,A15")
+        ev_str = ev_str.replace("B1-B16", "B1-B14,B16")
+        ev_str = ev_str.replace("B10-B16", "B10-B14,B16")
+        ev_str = ev_str.replace("B6-B16", "B6-B14,B16")
+        ev_str = ev_str.replace("B7-B16", "B7-B14,B16")
 
         if ev_str == "":
             return None
