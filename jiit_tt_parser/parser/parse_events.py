@@ -1095,10 +1095,12 @@ def parse_events(
 
 
 def split_hour_min(time_str):
+    print(time_str)
     if ":" in time_str or "." in time_str:
         parts = re.split(r"[:.]", time_str)
+        # print(parts)
         hour = int(parts[0])
-        minute = int(parts[1].strip("AMP ")) if len(parts) > 1 else 0
+        minute = int(parts[1].strip("AMP\n ")) if len(parts) > 1 else 0
     else:
         hour = int(time_str)
         minute = 0
