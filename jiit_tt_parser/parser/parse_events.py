@@ -927,6 +927,10 @@ def parse_day_with_electives(
                 or ev_str[1:].startswith("MINOR")
                 or any(e in ev_str for e in elective_set)
             ):
+                print(elective_cat)
+                print(ev_str[1:])
+                print(any(e in ev_str for e in elective_set))
+
                 cat = "MINOR"
                 if elective_cat:
                     cat = elective_cat
@@ -938,7 +942,8 @@ def parse_day_with_electives(
                 continue
 
             if isinstance(ev, Elective):
-                elective_set.add(ev.eventcode)
+                if not (ev.eventcode == "CS221" or ev.eventcode == "15B11EC411"):
+                    elective_set.add(ev.eventcode)
             events.append(ev)
 
     return events
