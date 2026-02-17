@@ -822,6 +822,7 @@ def parse_day_with_electives(
         "INSTITUNAL ACTIVITY",
         "MINOR-128",
         "PMinor-128(24B16PH211)-AP",
+        "INSTITUTIONAL ACTIVITY"
     ]
     spam_entries = [
         i.replace("\xa0", " ").replace("\n", " ").strip().upper().strip("/\\")
@@ -969,6 +970,7 @@ def parse_day(
         "LECTURE AND TUTORIAL CLASSES ARE BLOCKED FOR TALKS.",
         "/UNCHFORA10",
         "LUNCH FOR A10,B14,C1",
+        "INSTITUTIONAL ACTIVITY"
     ]
 
     elective_categories = [
