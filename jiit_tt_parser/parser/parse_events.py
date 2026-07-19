@@ -164,6 +164,7 @@ class Elective:
             for batch_str in raw_batches:
                 batch_str = batch_str.strip()
                 batch_str = re.sub(r"([A-Za-z])\1+", r"\1", batch_str)
+                batch_str = batch_str.strip("-")
                 print(batch_str)
                 if "-" in batch_str:
                     ev.batches.extend(parse_range(batch_str))
@@ -390,6 +391,9 @@ class Event:
         if "(GE1120" in ev_str:
             ev_str = ev_str.replace("(GE1120", "(GE112)")
 
+        if "P21F22" in ev_str:
+            ev_str = ev_str.replace("P21F22", "PF21F22")
+
         if ev_str == "":
             return None
         ev = cls(ev_str)
@@ -416,7 +420,7 @@ class Event:
 
         if "." in raw_batches:
             raw_batches = raw_batches.replace(".", ",")
-        ev.batches = parse_batches(raw_batches)
+        ev.batches = parse_batches(raw_batches.strip("-"))
 
         ev.batches = [i.strip() for i in ev.batches]
 
