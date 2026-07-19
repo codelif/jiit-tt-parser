@@ -165,7 +165,7 @@ class Elective:
                 batch_str = batch_str.strip()
                 batch_str = re.sub(r"([A-Za-z])\1+", r"\1", batch_str)
                 print(batch_str)
-                if "-" in batch_str and batch_str.count("-") <= 1:
+                if "-" in batch_str:
                     ev.batches.extend(parse_range(batch_str))
                     continue
 
@@ -636,10 +636,9 @@ def is_string_only_format(part):
 
 
 def parse_range(range_str):
-    """Parse a range like 'C1-C3' or 'C1-3' into individual batches."""
-    # Match patterns like C1-C3 or C1-3
-    match = re.match(r"^([A-Z])(\d+)-([A-Z]?)(\d+)$", range_str)
-    match3hy = re.match(r"^([A-Z])(\d+)-([A-Z]?)(\d+)-([A-Z]?)(\d+)$", range_str)
+    """Parse ranges such as C1-C3, C1-3, or BCA1-4."""
+    match = re.match(r"^([A-Z]+)(\d+)-([A-Z]*)(\d+)$", range_str)
+    match3hy = re.match(r"^([A-Z]+\d+)-([A-Z]*\d+)-([A-Z]*\d+)$", range_str)
 
     if match3hy:
         return range_str.split("-")
@@ -647,21 +646,18 @@ def parse_range(range_str):
     if not match:
         raise ValueError(f"Invalid range format: '{range_str}'")
 
-    start_letter = match.group(1)
+    start_prefix = match.group(1)
     start_num = int(match.group(2))
-    end_letter = match.group(3)
+    end_prefix = match.group(3)
     end_num = int(match.group(4))
 
-    # If end letter is provided, it must match start letter
-    if end_letter and end_letter != start_letter:
-        raise ValueError(f"Range cannot span different letters: '{range_str}'")
+    if end_prefix and end_prefix != start_prefix:
+        raise ValueError(f"Range cannot span different prefixes: '{range_str}'")
 
-    # Validate range order
     if start_num > end_num:
         raise ValueError(f"Invalid range order: '{range_str}'")
 
-    # Generate the range
-    return [f"{start_letter}{i}" for i in range(start_num, end_num + 1)]
+    return [f"{start_prefix}{i}" for i in range(start_num, end_num + 1)]
 
 
 def parse_concatenated(concat_str):
