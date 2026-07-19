@@ -9,8 +9,11 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from jiit_tt_parser.parser.parse_courses import parse_courses
 from jiit_tt_parser.parser.parse_electives import parse_electives
-from jiit_tt_parser.utils.utils import (are_cells_in_same_merged_group,
-                                        is_empty_row, load_map)
+from jiit_tt_parser.utils.utils import (
+    are_cells_in_same_merged_group,
+    is_empty_row,
+    load_map,
+)
 
 days_of_the_week_names = [
     "monday",
@@ -162,7 +165,7 @@ class Elective:
                 batch_str = batch_str.strip()
                 batch_str = re.sub(r"([A-Za-z])\1+", r"\1", batch_str)
                 print(batch_str)
-                if "-" in batch_str:
+                if "-" in batch_str and batch_str.count("-") <= 1:
                     ev.batches.extend(parse_range(batch_str))
                     continue
 
@@ -636,6 +639,10 @@ def parse_range(range_str):
     """Parse a range like 'C1-C3' or 'C1-3' into individual batches."""
     # Match patterns like C1-C3 or C1-3
     match = re.match(r"^([A-Z])(\d+)-([A-Z]?)(\d+)$", range_str)
+    match3hy = re.match(r"^([A-Z])(\d+)-([A-Z]?)(\d+)-([A-Z]?)(\d+)$", range_str)
+
+    if match3hy:
+        return range_str.split("-")
 
     if not match:
         raise ValueError(f"Invalid range format: '{range_str}'")
@@ -780,7 +787,7 @@ def fix_128tt_bad_merged_cells(
 
 
 def get_elective_categories_map():
-    ecats = ["HSS", "DE", "SE", "OE"]
+    ecats = ["HSS", "DE", "SE", "OE", "Elective Lab (CSE)"]
     elective_cats = {}
     for cats in ecats:
         for numbering in range(1, 10):
@@ -822,7 +829,7 @@ def parse_day_with_electives(
         "INSTITUNAL ACTIVITY",
         "MINOR-128",
         "PMinor-128(24B16PH211)-AP",
-        "INSTITUTIONAL ACTIVITY"
+        "INSTITUTIONAL ACTIVITY",
     ]
     spam_entries = [
         i.replace("\xa0", " ").replace("\n", " ").strip().upper().strip("/\\")
@@ -970,7 +977,7 @@ def parse_day(
         "LECTURE AND TUTORIAL CLASSES ARE BLOCKED FOR TALKS.",
         "/UNCHFORA10",
         "LUNCH FOR A10,B14,C1",
-        "INSTITUTIONAL ACTIVITY"
+        "INSTITUTIONAL ACTIVITY",
     ]
 
     elective_categories = [
@@ -1002,6 +1009,17 @@ def parse_day(
         "DE 6",
         "DE6",
         "DE-6",
+        "ELECTIVE LAB (CSE)",
+        "BLOCK",
+        "SE1/2",
+        "DE2/2",
+        "DE3/1",
+        "DE3/2",
+        "SE1/3",
+        "SE1/1",
+        "DE2/1",
+        "DE2/3",
+        "DE3/3",
     ]
     events = []
     if str(sheet.cell(start, 2).value).startswith("9"):
