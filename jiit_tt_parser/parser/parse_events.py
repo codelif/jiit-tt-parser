@@ -92,7 +92,7 @@ pattern = re.compile(r"^\s*(?:[E-F][0-9]+)(?:\s*[E-F][0-9]+)*\s*$")
 class Elective:
     def __init__(self, event_string: str):
         self.event_string = event_string
-        self.event_type: Literal["L", "T", "P"]
+        self.event_type: Literal["L", "T", "P", "Elective Lab (CSE)"]
         self.classroom: str
         self.event: str
         self.eventcode: str
@@ -787,7 +787,23 @@ def fix_128tt_bad_merged_cells(
 
 
 def get_elective_categories_map():
-    ecats = ["HSS", "DE", "SE", "OE", "Elective Lab (CSE)"]
+    ecats = [
+        "HSS",
+        "DE",
+        "SE",
+        "OE",
+        "Elective Lab (CSE)",
+        "BLOCK",
+        "SE1/2",
+        "DE2/2",
+        "DE3/1",
+        "DE3/2",
+        "SE1/3",
+        "SE1/1",
+        "DE2/1",
+        "DE2/3",
+        "DE3/3",
+    ]
     elective_cats = {}
     for cats in ecats:
         for numbering in range(1, 10):
@@ -807,7 +823,22 @@ def get_elective_categories_map():
             elective_cats.update({f"{cats}{numbering}": f"{cats}-{numbering}"})
 
         elective_cats.update({cats: cats})
-
+    elective_cats.update(
+        {
+            "Elective Lab (CSE)": "ELECTIVE LAB (CSE)",
+            "BLOCK": "MINOR",
+            "SE1/2": "SE-1",
+            "DE2/2": "DE-2",
+            "DE3/1": "DE-3",
+            "DE3/2": "DE-3",
+            "SE1/3": "SE-1",
+            "SE1/1": "SE-1",
+            "DE2/1": "DE-2",
+            "DE2/3": "DE-2",
+            "DE3/3": "DE-3",
+            "ELECTIVE LAB (CSE)": "ELECTIVE LAB (CSE)",
+        }
+    )
     return elective_cats
 
 
@@ -837,6 +868,7 @@ def parse_day_with_electives(
     ]
 
     elective_cats = get_elective_categories_map()
+    print(elective_cats)
     hardcoded_bullshit = {
         "25B12CS211": "Fundamentals of Data Analytics",
         "25B12CS212": "Fundamentals of Mobile Application Development",
@@ -915,8 +947,11 @@ def parse_day_with_electives(
                 .upper()
                 .strip("/\\")
             )
-            ecat = elective_cats.get(ev_str)
+            print("this is me karvy singh and this is elective lab cat")
+            print(ev_str)
+            ecat = elective_cats.get(ev_str.upper())
             if ecat:
+                print("done cat")
                 elective_cat = ecat
                 continue
 
@@ -935,6 +970,7 @@ def parse_day_with_electives(
                 or ev_str[1:].startswith("MINOR")
                 or any(e in ev_str for e in elective_set)
             ):
+                print("noew in loop")
                 print(elective_cat)
                 print(ev_str[1:])
                 print(any(e in ev_str for e in elective_set))
@@ -1095,9 +1131,9 @@ def parse_events(
     curriculum_courses["25B15EC311"] = "Digital Systems and Computer Organisation"
     events = []
     title = str(sheet.cell(1, 1).value).replace("\xa0", " ").replace("\n", " ").strip()
-    is_4th_sem = "B.Tech IV SEMESTER-EVEN SEM 2026" in title
+    is_5th_sem = "B.TECH V SEMESTER - ODD 2026" in title
 
-    parse_func = parse_day_with_electives if is_4th_sem else parse_day
+    parse_func = parse_day_with_electives if is_5th_sem else parse_day
     for day in days_of_the_week_names:
         r = get_day_row(sheet, row, col, day)
         if r < 0:
