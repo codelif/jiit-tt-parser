@@ -294,12 +294,15 @@ class Event:
         day: str,
         courses: dict,
         faculties: dict,
+        classify_electives: bool = True,
     ):
-        if any(e in ev_str for e in ["25B16CS213", "25B16CS212", "25B16CS211"]):
+        if classify_electives and any(
+            e in ev_str for e in ["25B16CS213", "25B16CS212", "25B16CS211"]
+        ):
             return Elective.from_string(
                 ev_str, period, day, courses, faculties, "DE-1 LAB"
             )
-        if any(
+        if classify_electives and any(
             e in ev_str
             for e in [
                 "(17B1NEC735)",
@@ -316,7 +319,7 @@ class Event:
             ]
         ):
             return Elective.from_string(ev_str, period, day, courses, faculties, "DE-1")
-        if any(
+        if classify_electives and any(
             e in ev_str
             for e in [
                 "15B1NHS431",
@@ -852,6 +855,7 @@ def parse_day_with_electives(
     merged_cells: list[CellRange],
     courses: dict,
     faculties: dict,
+    elective_courses: dict | None = None,
 ) -> List[Event | Elective]:
     spam_entries = [
         "LUNCH",
@@ -922,14 +926,12 @@ def parse_day_with_electives(
     courses = courses.copy()
     courses.update(hardcoded_bullshit)
     events = []
+    elective_courses = elective_courses or courses
     if str(sheet.cell(start, 2).value).startswith("9"):
         start += 1
-    elective_set = set()
     for j in range(2, col + 1):
         r = start
-        elective_cat = (
-            "MINOR" if periods[j - 2].start_time == datetime.time(13, 0) else ""
-        )
+        elective_cat = ""
         reached_end = False
         while not reached_end:
             reached_end = is_end_of_day(sheet, r, day, col)
@@ -965,29 +967,36 @@ def parse_day_with_electives(
             if m := search_merged_cells(merged_cells, c):
                 ep += periods[m - 2]
 
+            event_category = elective_cat
+            if event_category == "ELECTIVE LAB (CSE)" and not ev_str.startswith("P"):
+                event_category = ""
+
             if (
-                elective_cat
+                event_category
                 or ev_str[1:].startswith("MINOR")
-                or any(e in ev_str for e in elective_set)
             ):
                 print("noew in loop")
                 print(elective_cat)
                 print(ev_str[1:])
-                print(any(e in ev_str for e in elective_set))
 
                 cat = "MINOR"
-                if elective_cat:
-                    cat = elective_cat
+                if event_category:
+                    cat = event_category
 
-                ev = Elective.from_string(ev_str, ep, day, courses, faculties, cat)
+                ev = Elective.from_string(
+                    ev_str, ep, day, elective_courses, faculties, cat
+                )
             else:
-                ev = Event.from_string(ev_str, ep, day, courses, faculties)
+                ev = Event.from_string(
+                    ev_str,
+                    ep,
+                    day,
+                    courses,
+                    faculties,
+                    classify_electives=False,
+                )
             if ev is None:
                 continue
-
-            if isinstance(ev, Elective):
-                if not (ev.eventcode == "CS221" or ev.eventcode == "15B11EC411"):
-                    elective_set.add(ev.eventcode)
             events.append(ev)
 
     return events
@@ -1003,6 +1012,7 @@ def parse_day(
     merged_cells: list[CellRange],
     courses: dict,
     faculties: dict,
+    _elective_courses: dict | None = None,
 ) -> List[Event]:
     spam_entries = [
         "LUNCH",
@@ -1112,6 +1122,8 @@ def parse_events(
     col: int,
     faculty_map_path: str,
     curriculum_map_path: str = "curriculum.json",
+    course_context: str = "",
+    course_mappings_path: str = "course_mappings.json",
 ) -> List[Event | Elective]:
     time_row, col = get_time_row(sheet, row, col)
     periods = get_periods(sheet, row, col, time_row)
@@ -1129,6 +1141,17 @@ def parse_events(
         new_courses.update({k[3:]: v, k: v})
     curriculum_courses["super_secret_key"] = new_courses
     curriculum_courses["25B15EC311"] = "Digital Systems and Computer Organisation"
+    course_mappings = load_map(course_mappings_path)
+    elective_overrides = course_mappings["electives"].get(course_context)
+    core_course_lookup = curriculum_courses
+    elective_course_lookup = curriculum_courses
+    if elective_overrides is not None:
+        core_course_lookup = apply_course_overrides(
+            curriculum_courses, course_mappings["core_courses"]
+        )
+        elective_course_lookup = apply_course_overrides(
+            curriculum_courses, elective_overrides
+        )
     events = []
     title = str(sheet.cell(1, 1).value).replace("\xa0", " ").replace("\n", " ").strip()
     is_5th_sem = "B.TECH V SEMESTER - ODD 2026" in title
@@ -1147,8 +1170,9 @@ def parse_events(
                 periods,
                 day,
                 merged_cells,
-                curriculum_courses,
+                core_course_lookup,
                 faculties,
+                elective_course_lookup,
             )
         )
 
@@ -1396,6 +1420,32 @@ def check_list_classroom_teacher_format(string_list):
     return parsed_list, all_match
 
 
+def apply_course_overrides(courses: dict, overrides: dict) -> dict:
+    aliases = {}
+    for code, name in overrides.items():
+        aliases[code] = name
+        match = re.match(r"^(\d{2})B\d+([A-Z].*)$", code)
+        if not match:
+            continue
+
+        aliases[code[2:]] = name
+        aliases[code[3:]] = name
+        year, short_code = match.groups()
+        # Prefer the first theory code when a theory and lab share a short code.
+        aliases.setdefault(short_code, name)
+        aliases.setdefault(f"{year}{short_code}", name)
+        if short_code.startswith("N"):
+            aliases.setdefault(short_code[1:], name)
+            aliases.setdefault(f"{year}{short_code[1:]}", name)
+
+    result = courses.copy()
+    fallback = result.get("super_secret_key", {}).copy()
+    result.update(aliases)
+    fallback.update(aliases)
+    result["super_secret_key"] = fallback
+    return result
+
+
 def lookup_sub(subject_code, subject_dict):
     """
     Lookup subject name from potentially malformed subject code.
@@ -1409,6 +1459,11 @@ def lookup_sub(subject_code, subject_dict):
     """
     if not subject_code or not subject_dict:
         return None
+
+    if "+" in subject_code:
+        names = [lookup_sub(code.strip(), subject_dict) for code in subject_code.split("+")]
+        if all(names):
+            return " + ".join(names)
 
     if (
         v := subject_dict.get(subject_code)
