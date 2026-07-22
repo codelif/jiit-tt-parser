@@ -611,13 +611,14 @@ def parse_batches(batch_string):
         elif part.isdigit():
             if current_letter is None:
                 raise ValueError(f"Number '{part}' found without a preceding letter")
-            result.append(f"{current_letter}{part}")
+            result.extend(expand_batch_number(current_letter, part))
 
         # Check if it's a single batch code
-        elif re.match(r"^[A-Z]\d+$", part):
-            result.append(part)
+        elif match := re.match(r"^([A-Z])(\d+)$", part):
+            letter, number = match.groups()
+            result.extend(expand_batch_number(letter, number))
             # Update current letter
-            current_letter = part[0]
+            current_letter = letter
 
         elif part.startswith("BCA"):
             result.append(part)
@@ -675,7 +676,16 @@ def parse_concatenated(concat_str):
     if not matches:
         raise ValueError(f"No valid batch codes found in: '{concat_str}'")
 
-    return [f"{letter}{number}" for letter, number in matches]
+    batches = []
+    for letter, number in matches:
+        batches.extend(expand_batch_number(letter, number))
+    return batches
+
+
+def expand_batch_number(letter: str, number: str) -> list[str]:
+    if len(number) == 4:
+        return [f"{letter}{number[:2]}", f"{letter}{number[2:]}"]
+    return [f"{letter}{number}"]
 
 
 def split_on_regex_starts(s: str, rx: re.Pattern) -> list[str]:
@@ -856,6 +866,8 @@ def parse_day_with_electives(
     courses: dict,
     faculties: dict,
     elective_courses: dict | None = None,
+    elective_only_codes: set[str] | None = None,
+    _elective_columns: set[int] | None = None,
 ) -> List[Event | Elective]:
     spam_entries = [
         "LUNCH",
@@ -927,6 +939,7 @@ def parse_day_with_electives(
     courses.update(hardcoded_bullshit)
     events = []
     elective_courses = elective_courses or courses
+    elective_only_codes = elective_only_codes or set()
     if str(sheet.cell(start, 2).value).startswith("9"):
         start += 1
     for j in range(2, col + 1):
@@ -971,10 +984,16 @@ def parse_day_with_electives(
             if event_category == "ELECTIVE LAB (CSE)" and not ev_str.startswith("P"):
                 event_category = ""
 
-            if (
-                event_category
-                or ev_str[1:].startswith("MINOR")
-            ):
+            code_match = re.search(r"\(([^)]+)\)", ev_str)
+            is_saturday_elective_lab = (
+                day.lower() == "saturday"
+                and ev_str.startswith("P")
+                and code_match is not None
+                and code_match.group(1).strip() in elective_only_codes
+            )
+            is_explicit_minor = ev_str[1:].startswith("MINOR")
+
+            if event_category or is_explicit_minor or is_saturday_elective_lab:
                 print("noew in loop")
                 print(elective_cat)
                 print(ev_str[1:])
@@ -982,6 +1001,8 @@ def parse_day_with_electives(
                 cat = "MINOR"
                 if event_category:
                     cat = event_category
+                elif is_saturday_elective_lab and not is_explicit_minor:
+                    cat = "ELECTIVE LAB (CSE)"
 
                 ev = Elective.from_string(
                     ev_str, ep, day, elective_courses, faculties, cat
@@ -1012,8 +1033,10 @@ def parse_day(
     merged_cells: list[CellRange],
     courses: dict,
     faculties: dict,
-    _elective_courses: dict | None = None,
-) -> List[Event]:
+    elective_courses: dict | None = None,
+    elective_only_codes: set[str] | None = None,
+    elective_columns: set[int] | None = None,
+) -> List[Event | Elective]:
     spam_entries = [
         "LUNCH",
         "ALL BATCH FREE FOR MEETING",
@@ -1068,6 +1091,9 @@ def parse_day(
         "DE3/3",
     ]
     events = []
+    elective_courses = elective_courses or courses
+    elective_only_codes = elective_only_codes or set()
+    elective_columns = elective_columns or set()
     if str(sheet.cell(start, 2).value).startswith("9"):
         start += 1
 
@@ -1107,7 +1133,28 @@ def parse_day(
                 except:
                     ep += periods[m - 3]
 
-            ev = Event.from_string(ev_str, ep, day, courses, faculties)
+            code_match = re.search(r"\(([^)]+)\)", ev_str)
+            is_mapped_elective = (
+                j in elective_columns
+                and code_match is not None
+                and code_match.group(1).strip() in elective_only_codes
+            )
+            if is_mapped_elective:
+                category = (
+                    "ELECTIVE LAB (CSE)" if ev_str.startswith("P") else "ELECTIVE"
+                )
+                ev = Elective.from_string(
+                    ev_str, ep, day, elective_courses, faculties, category
+                )
+            else:
+                ev = Event.from_string(
+                    ev_str,
+                    ep,
+                    day,
+                    courses,
+                    faculties,
+                    classify_electives=not elective_columns,
+                )
             if ev is None:
                 continue
             events.append(ev)
@@ -1142,16 +1189,26 @@ def parse_events(
     curriculum_courses["super_secret_key"] = new_courses
     curriculum_courses["25B15EC311"] = "Digital Systems and Computer Organisation"
     course_mappings = load_map(course_mappings_path)
-    elective_overrides = course_mappings["electives"].get(course_context)
+    mapping_context = course_mappings.get("context_aliases", {}).get(
+        course_context, course_context
+    )
+    elective_overrides = course_mappings["electives"].get(mapping_context)
+    elective_columns = set(
+        course_mappings.get("elective_columns", {}).get(course_context, [])
+    )
     core_course_lookup = curriculum_courses
     elective_course_lookup = curriculum_courses
+    elective_only_codes = set()
     if elective_overrides is not None:
+        core_aliases = get_course_aliases(course_mappings["core_courses"])
+        elective_aliases = get_course_aliases(elective_overrides)
         core_course_lookup = apply_course_overrides(
             curriculum_courses, course_mappings["core_courses"]
         )
         elective_course_lookup = apply_course_overrides(
             curriculum_courses, elective_overrides
         )
+        elective_only_codes = set(elective_aliases) - set(core_aliases)
     events = []
     title = str(sheet.cell(1, 1).value).replace("\xa0", " ").replace("\n", " ").strip()
     is_5th_sem = "B.TECH V SEMESTER - ODD 2026" in title
@@ -1173,6 +1230,8 @@ def parse_events(
                 core_course_lookup,
                 faculties,
                 elective_course_lookup,
+                elective_only_codes,
+                elective_columns,
             )
         )
 
@@ -1420,7 +1479,7 @@ def check_list_classroom_teacher_format(string_list):
     return parsed_list, all_match
 
 
-def apply_course_overrides(courses: dict, overrides: dict) -> dict:
+def get_course_aliases(overrides: dict) -> dict:
     aliases = {}
     for code, name in overrides.items():
         aliases[code] = name
@@ -1437,6 +1496,12 @@ def apply_course_overrides(courses: dict, overrides: dict) -> dict:
         if short_code.startswith("N"):
             aliases.setdefault(short_code[1:], name)
             aliases.setdefault(f"{year}{short_code[1:]}", name)
+
+    return aliases
+
+
+def apply_course_overrides(courses: dict, overrides: dict) -> dict:
+    aliases = get_course_aliases(overrides)
 
     result = courses.copy()
     fallback = result.get("super_secret_key", {}).copy()
