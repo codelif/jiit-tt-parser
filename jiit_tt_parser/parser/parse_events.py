@@ -119,7 +119,9 @@ class Elective:
         if "LB10-B14(CS211)-F8/NET" in ev_str:
             category = "DE-1"
 
-        ev_str = ev_str.strip().replace("\n", " ").replace("\xa0", " ")
+        ev_str = repair_missing_course_parenthesis(
+            ev_str.strip().replace("\n", " ").replace("\xa0", " ")
+        )
         print(repr(ev_str))
         og = ev_str
         ev_str = ev_str.replace("A10-A15", "A10,A15")
@@ -196,10 +198,16 @@ class Elective:
         classroom: str
         teacher: str
         ok: bool
-        classroom, teacher, ok = parse_classroom_teacher_format(ev_str)
+        classroom, parenthesized_faculty, ok = parse_parenthesized_faculty_format(
+            ev_str
+        )
         if ok:
-            subs = [classroom, teacher]
+            subs = [classroom, *parenthesized_faculty]
         else:
+            classroom, teacher, ok = parse_classroom_teacher_format(ev_str)
+        if ok and not parenthesized_faculty:
+            subs = [classroom, teacher]
+        elif not ok:
             subs = extract_substrings(ev_str)
 
         if any(
@@ -231,12 +239,12 @@ class Elective:
 
         ev.lecturer = subs
         for i in range(len(ev.lecturer)):
-            lecturer = ev.lecturer[i].strip("- ")
+            lecturer = ev.lecturer[i].strip("- ()")
             v = faculties.get(lecturer)
             if v is not None:
                 lecturer = v.title()
 
-            ev.lecturer[i] = " ".join(lecturer.strip("- ").split())
+            ev.lecturer[i] = " ".join(lecturer.strip("- ()").split())
             nf, ok = get_new_faculty(ev.lecturer[i])
             if ok:
                 ev.lecturer[i] = nf
@@ -337,7 +345,9 @@ class Event:
                 ev_str, period, day, courses, faculties, "HSS-1"
             )
 
-        ev_str = ev_str.strip().replace("\n", " ").replace("\xa0", " ")
+        ev_str = repair_missing_course_parenthesis(
+            ev_str.strip().replace("\n", " ").replace("\xa0", " ")
+        )
         print(repr(ev_str))
         og = ev_str
 
@@ -452,10 +462,16 @@ class Event:
         classroom: str
         teacher: str
         ok: bool
-        classroom, teacher, ok = parse_classroom_teacher_format(ev_str)
+        classroom, parenthesized_faculty, ok = parse_parenthesized_faculty_format(
+            ev_str
+        )
         if ok:
-            subs = [classroom, teacher]
+            subs = [classroom, *parenthesized_faculty]
         else:
+            classroom, teacher, ok = parse_classroom_teacher_format(ev_str)
+        if ok and not parenthesized_faculty:
+            subs = [classroom, teacher]
+        elif not ok:
             subs = extract_substrings(ev_str)
 
         if any(
@@ -483,13 +499,16 @@ class Event:
 
         ev.lecturer = subs
         for i in range(len(ev.lecturer)):
-            lecturer = ev.lecturer[i].strip("- ")
+            lecturer = ev.lecturer[i].strip("- ()")
             v = faculties.get(lecturer)
             if v is not None:
                 lecturer = v.title()
 
             ev.lecturer[i] = " ".join(
-                lecturer.replace("\xa0", " ").replace("\n", " ").strip("- ").split()
+                lecturer.replace("\xa0", " ")
+                .replace("\n", " ")
+                .strip("- ()")
+                .split()
             )
             nf, ok = get_new_faculty(ev.lecturer[i])
             if ok:
@@ -555,6 +574,28 @@ def extract_substrings(input_string, delimiters=",/\\"):
     result = [substring.strip() for substring in substrings if substring.strip()]
 
     return result
+
+
+def repair_missing_course_parenthesis(event_string: str) -> str:
+    return re.sub(
+        r"^([LTP])([A-Z]+\d+)([A-Z]{2}\d+)\)",
+        r"\1\2(\3)",
+        event_string,
+    )
+
+
+def parse_parenthesized_faculty_format(
+    input_string: str,
+) -> tuple[str, List[str], bool]:
+    match = re.fullmatch(r"\s*(.+?)\s*\(([^()]*)\)\s*", input_string)
+    if not match:
+        return "", [], False
+
+    classroom, raw_faculty = match.groups()
+    faculty = extract_substrings(raw_faculty)
+    if not classroom.strip() or not faculty:
+        return "", [], False
+    return classroom.strip(" -"), faculty, True
 
 
 def parse_batches(batch_string):
@@ -1670,7 +1711,7 @@ def lookup_medium_format(code, subject_dict):
 
 
 def lookup_short_format(code, subject_dict):
-    """Lookup short format - direct lookup only."""
+    """Lookup short format directly or by an unambiguous full-code suffix."""
     # Fix 4 digits to 3 if needed
     match = re.match(r"^([A-Z]{2})(\d{3,4})$", code)
     if match:
@@ -1679,6 +1720,18 @@ def lookup_short_format(code, subject_dict):
         if len(digits) == 4:
             digits = digits[:3]
         fixed_code = chars + digits
-        return subject_dict.get(fixed_code)
+        if value := subject_dict.get(fixed_code):
+            return value
+
+        matches = {
+            value
+            for key, value in subject_dict.items()
+            if isinstance(key, str)
+            and isinstance(value, str)
+            and key.endswith(fixed_code)
+        }
+        if len(matches) == 1:
+            return matches.pop()
+        return None
 
     return subject_dict.get(code)
