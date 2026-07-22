@@ -868,6 +868,7 @@ def parse_day_with_electives(
     elective_courses: dict | None = None,
     elective_only_codes: set[str] | None = None,
     _elective_columns: set[int] | None = None,
+    _minor_codes: set[str] | None = None,
 ) -> List[Event | Elective]:
     spam_entries = [
         "LUNCH",
@@ -1036,6 +1037,7 @@ def parse_day(
     elective_courses: dict | None = None,
     elective_only_codes: set[str] | None = None,
     elective_columns: set[int] | None = None,
+    minor_codes: set[str] | None = None,
 ) -> List[Event | Elective]:
     spam_entries = [
         "LUNCH",
@@ -1094,6 +1096,7 @@ def parse_day(
     elective_courses = elective_courses or courses
     elective_only_codes = elective_only_codes or set()
     elective_columns = elective_columns or set()
+    minor_codes = minor_codes or set()
     if str(sheet.cell(start, 2).value).startswith("9"):
         start += 1
 
@@ -1140,9 +1143,13 @@ def parse_day(
                 and code_match.group(1).strip() in elective_only_codes
             )
             if is_mapped_elective:
-                category = (
-                    "ELECTIVE LAB (CSE)" if ev_str.startswith("P") else "ELECTIVE"
-                )
+                code = code_match.group(1).strip()
+                if code in minor_codes:
+                    category = "MINOR"
+                elif ev_str.startswith("P"):
+                    category = "ELECTIVE LAB (CSE)"
+                else:
+                    category = "ELECTIVE"
                 ev = Elective.from_string(
                     ev_str, ep, day, elective_courses, faculties, category
                 )
@@ -1192,14 +1199,24 @@ def parse_events(
     mapping_context = course_mappings.get("context_aliases", {}).get(
         course_context, course_context
     )
-    elective_overrides = course_mappings["electives"].get(mapping_context)
+    base_electives = course_mappings["electives"].get(mapping_context)
+    additions = course_mappings.get("elective_additions", {}).get(
+        course_context, {}
+    )
+    minor_courses = course_mappings.get("minor_courses", {}).get(
+        course_context, {}
+    )
+    elective_overrides = dict(base_electives or {})
+    elective_overrides.update(additions)
+    elective_overrides.update(minor_courses)
     elective_columns = set(
         course_mappings.get("elective_columns", {}).get(course_context, [])
     )
     core_course_lookup = curriculum_courses
     elective_course_lookup = curriculum_courses
     elective_only_codes = set()
-    if elective_overrides is not None:
+    minor_codes = set(get_course_aliases(minor_courses))
+    if elective_overrides:
         core_aliases = get_course_aliases(course_mappings["core_courses"])
         elective_aliases = get_course_aliases(elective_overrides)
         core_course_lookup = apply_course_overrides(
@@ -1232,6 +1249,7 @@ def parse_events(
                 elective_course_lookup,
                 elective_only_codes,
                 elective_columns,
+                minor_codes,
             )
         )
 
